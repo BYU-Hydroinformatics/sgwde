@@ -1,0 +1,25 @@
+{% extends "sgwde/base.html" %}
+{% load staticfiles %}
+{% load tethys_gizmos %}
+{% block global_scripts %}
+  {{ block.super }}
+  <script src="{% static 'sgwde/js/drift/dist/Drift.js' %}" type="text/javascript"></script>
+{% endblock %}
+{% block app_navigation_items %}
+
+<form id="get-plot" name="get-plot" action="get_plot/" method="POST">
+    {% csrf_token %}
+    {% gizmo select_input select_variable %}
+    {% gizmo select_input select_date %}
+    <button type="button" id="btn-get-plot" name="btn-get-plot" class="btn btn-default">Show Plot</button>
+</form>
+{% endblock %}
+{% block app_content %}
+<h3>WRF Plots</h3>
+<span>(Click on Show Plot to view Plots)</span>
+<div align="center" id="plot" class="plot"></div>
+
+{% endblock %}
+
+{% block app_actions %}
+{% endblock %}
