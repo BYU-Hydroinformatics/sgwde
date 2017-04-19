@@ -1,22 +1,90 @@
 {% extends "sgwde/base.html" %}
 {% load staticfiles %}
 {% load tethys_gizmos %}
+{% block styles %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'tethys_gizmos/vendor/openlayers/ol.css' %}" type="text/css">
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+{% endblock %}
+
 {% block global_scripts %}
-  {{ block.super }}
-  <script src="{% static 'sgwde/js/drift/dist/Drift.js' %}" type="text/javascript"></script>
+{{ block.super }}
+
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="{% static 'tethys_gizmos/vendor/openlayers/ol.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block app_content_wrapper_override %}
+
+{{ block.super }}
+
+<form id="modalUpload" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Upload Shapefile</h4>
+            </div>
+            <div class="modal-body">
+                <div class="form-group shp_upload">
+                    <label class="control-label" for="shp-upload-input">Multiple Files are allowed</label>
+                    <input id="shp-upload-input" name="shp-upload-input" type="file" multiple>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="button-group">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="button" id="btn-add-shp" class="btn btn-default">Add</button>
+                </div>
+            </div>
+        </div>
+        <!--End modal content-->
+    </div>
+</form>
+
 {% endblock %}
 {% block app_navigation_items %}
+<style>
+    #map{
+        width:100%;
+        height: 400px;
+    }
+</style>
+<b>Map Interaction</b>
+<select id="types" class="btn btn-xs btn-success" data-width="fit">
+    <option value="None">None</option>
+    <option value="Point">Point</option>
+    <option value="Polygon">Polygon</option>
+    <option value="Upload">Upload Shapefile</option>
 
+</select>
+<br>
+<br>
 <form id="get-plot" name="get-plot" action="get_plot/" method="POST">
     {% csrf_token %}
     {% gizmo select_input select_variable %}
     {% gizmo select_input select_date %}
+    <input type="text" name="point-lat-lon" id="point-lat-lon" hidden>
+    <input type="text" name="poly-lat-lon" id="poly-lat-lon" hidden>
+    <input type="text" name="shp-lat-lon" id="shp-lat-lon" hidden>
     <button type="button" id="btn-get-plot" name="btn-get-plot" class="btn btn-default">Show Plot</button>
 </form>
+<div class="warning"></div>
 {% endblock %}
 {% block app_content %}
 <h3>WRF Plots</h3>
 <span>(Click on Show Plot to view Plots)</span>
+<div id="map"></div>
+<br>
+<div>
+    <div class="chart-wrapper">
+        <div class="chart-inner">
+            <!--<div class="flex-container-row"><img id="view-file-loading" class="view-file hidden" src="/static/servir/images/loader.gif" /></div>-->
+            <div id="plotter" name="plotter" style="height:275px;width:90%" ></div>
+        </div>
+    </div>
+</div>
 <div align="center" id="plot" class="plot"></div>
 
 {% endblock %}

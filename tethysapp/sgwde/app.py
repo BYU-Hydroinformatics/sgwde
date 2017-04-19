@@ -30,6 +30,9 @@ class ServirGriddedWaterObservationsExplorer(TethysAppBase):
                     UrlMap(name='get-plot',
                            url='sgwde/get-plot',
                            controller='sgwde.controllers.get_plot'),
+                    UrlMap(name='upload-shp',
+                           url='sgwde/upload-shp',
+                           controller='sgwde.controllers_ajax.upload_shp'),
         )
 
         return url_maps

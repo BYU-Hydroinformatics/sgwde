@@ -1,8 +1,8 @@
 # import subprocess
 # from PIL import Image
 # import gdal
-# import numpy as np
-# from netCDF4 import Dataset
+import numpy as np
+from netCDF4 import Dataset
 # import urllib2, json, mimetypes,os,urlparse
 # import ftplib
 # from StringIO import StringIO
@@ -15,8 +15,176 @@
 # import scipy.ndimage
 # from mpl_toolkits.basemap import Basemap
 # import numpy
-# import os,os.path
+import os,os.path
 from datetime import datetime, timedelta
+import json
+from json import dumps
+import time, calendar
+import functools
+import fiona
+import geojson
+import pyproj
+import shapely.geometry
+import shapely.ops
+import os, tempfile, shutil, sys
+
+# def get_val():
+#     file  ='/home/tethys/wrf/wrfout_d02_2017-03-09_21:00:00'
+#     nc_file = Dataset(file,'r')
+#     precip = nc_file.variables['T02_MEAN'][0,:,:]
+#     lats = nc_file.variables['XLAT'][0,:,:]
+#     lons = nc_file.variables['XLONG'][0,:,:]
+#     stn_lat = float('20.7')
+#     stn_lon = float('70.8')
+#     abslat = np.abs(lats - stn_lat)
+#     abslon = np.abs(lons - stn_lon)
+#     c = np.maximum(abslon,abslat)
+#     x, y = np.where(c == np.min(c))
+#     grid_temp = precip[x[0], y[0]]
+
+
+def get_mean(bounds,variable):
+    graph_json= {}
+    file_dir = '/wrf/'
+    miny = float(bounds[1])
+    minx = float(bounds[0])
+    maxx = float(bounds[2])
+    maxy = float(bounds[3])
+
+    ts_plot = []
+
+    for file in os.listdir(file_dir):
+        nc_fid = Dataset(file_dir + file, 'r')
+        lats = nc_fid.variables['XLAT'][0, :, :]
+        lons = nc_fid.variables['XLONG'][0, :, :]
+        field = nc_fid.variables[variable][0, :, :]
+        abslat = np.abs(lats - miny)
+        abslon = np.abs(lons - minx)
+        abslat2 = np.abs(lats - maxy)
+        abslon2= np.abs(lons - maxx)
+
+        c = np.maximum(abslon, abslat)
+        minx_idx, miny_idx = np.where(c == np.min(c))
+
+        d = np.maximum(abslon2, abslat2)
+        maxx_idx, maxy_idx = np.where(d == np.min(d))
+
+        values = field[minx_idx[0]:maxx_idx[0],miny_idx[0]:maxy_idx[0]]
+
+
+        var_val = np.mean(values)
+
+        file_ls = file.split('_')
+        day = file_ls[2].split('-')
+        timing = file_ls[3].split(':')
+
+        date_string = datetime(int(day[0]), int(day[1]), int(day[2]), int(timing[0]), int(timing[1]), int(timing[2]))
+        time_stamp = calendar.timegm(date_string.utctimetuple()) * 1000
+        ts_plot.append([time_stamp, float(var_val)])
+        ts_plot.sort()
+
+
+    graph_json["values"] = ts_plot
+    graph_json["bounds"] = [round(minx,2),round(miny,2),round(maxx,2),round(maxy,2)]
+    graph_json = json.dumps(graph_json)
+    return graph_json
+
+def get_ts_plot(variable,pt_coords):
+    graph_json = {}
+    ts_plot = []
+
+    file_dir = '/wrf/'
+    coords = pt_coords.split(',')
+    stn_lat = float(coords[1])
+    stn_lon = float(coords[0])
+    for file in os.listdir(file_dir):
+        nc_fid = Dataset(file_dir + file, 'r')
+        lats = nc_fid.variables['XLAT'][0,:,:]
+        lons = nc_fid.variables['XLONG'][0,:,:]
+        field = nc_fid.variables[variable][0,:,:]
+        abslat = np.abs(lats - stn_lat)
+        abslon = np.abs(lons - stn_lon)
+        c = np.maximum(abslon, abslat)
+        x, y = np.where(c == np.min(c))
+        var_val = field[x[0], y[0]]
+
+        file_ls = file.split('_')
+        day = file_ls[2].split('-')
+        timing = file_ls[3].split(':')
+        # file_dt = datetime.strptime(file_ls[2]+' '+file_ls[3], "%Y-%m-%d %H:%M:%S")
+        date_string = datetime(int(day[0]),int(day[1]),int(day[2]),int(timing[0]),int(timing[1]),int(timing[2]))
+        time_stamp = calendar.timegm(date_string.utctimetuple()) * 1000
+        # ts_plot.append([datetime(int(day[0]),int(day[1]),int(day[2]),int(timing[0]),int(timing[1])),var_val])
+        ts_plot.append([time_stamp,float(var_val)])
+        ts_plot.sort()
+    graph_json["values"] = ts_plot
+    graph_json["point"] = [round(stn_lat,2),round(stn_lon,2)]
+    graph_json = json.dumps(graph_json)
+    return graph_json
+
+def convert_shp(files):
+    geojson_string = ''
+    try:
+        temp_dir = tempfile.mkdtemp()
+        for f in files:
+            f_name = f.name
+            f_path = os.path.join(temp_dir,f_name)
+
+            with open(f_path,'wb') as f_local:
+                f_local.write(f.read())
+
+
+        for file in os.listdir(temp_dir):
+            if file.endswith(".shp"):
+                f_path = os.path.join(temp_dir,file)
+                omit = ['SHAPE_AREA', 'SHAPE_LEN']
+
+                with fiona.open(f_path) as source:
+                    project = functools.partial(pyproj.transform,
+                                                pyproj.Proj(**source.crs),
+                                                pyproj.Proj(init='epsg:3857'))
+                    features = []
+                    for f in source:
+                        shape = shapely.geometry.shape(f['geometry'])
+                        projected_shape = shapely.ops.transform(project, shape)
+
+                        # Remove the properties we don't want
+                        props = f['properties']  # props is a reference
+                        for k in omit:
+                            if k in props:
+                                del props[k]
+
+                        feature = geojson.Feature(id=f['id'],
+                                                  geometry=projected_shape,
+                                                  properties=props)
+                        features.append(feature)
+                    fc = geojson.FeatureCollection(features)
+
+                    geojson_string = geojson.dumps(fc)
+
+
+    except:
+        return 'error'
+    finally:
+        if temp_dir is not None:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                # for file in files:
+                #     if str(file).endswith('.shp'):
+                #         reader = shapefile.Reader(file)
+                #         fields = reader.fields[1:]
+                #         field_names = [field[0] for field in fields]
+                #         buffer = []
+                #         for sr in reader.shapeRecords():
+                #             atr = dict(zip(field_names, sr.record))
+                #             geom = sr.shape.__geo_interface__
+                #             buffer.append(dict(type="Feature", geometry=geom, properties=atr))
+
+                # print buffer
+
+    return geojson_string
+
+
 
 # Code for creating the plots
 # def create_png():
@@ -63,7 +231,7 @@ from datetime import datetime, timedelta
 #     Parameters
 #     ----------
 #     nc_fid : netCDF4.Dataset
-#         A netCDF4 dateset object
+#         A netCDF4 dateset objecte
 #     verb : Boolean
 #         whether or not nc_attrs, nc_dims, and nc_vars are printed
 #
