@@ -17,22 +17,40 @@ var SGWDE_PACKAGE = (function() {
     /************************************************************************
      *                      MODULE LEVEL / GLOBAL VARIABLES
      *************************************************************************/
-    var shpSource,shpLayer,layers,map;
+    var shpSource, //Source for the layer storing the uploaded shapefile
+        shpLayer,   //Layer for the uplaoded shapefile
+        layers, //List of all the map layers
+        map;    //map object
 
     /************************************************************************
      *                    PRIVATE FUNCTION DECLARATIONS
      *************************************************************************/
-    var addDefaultBehaviorToAjax,$btnUpload,checkCsrfSafe,clear_coords,getCookie,get_plot,$get_plot,init_events,init_jquery_var,init_map,$modalUpload,prepare_files,upload_file;
+    var addDefaultBehaviorToAjax, //Adding a csrf token to every ajax request
+        $btnUpload,
+        checkCsrfSafe, //Check if the CSRF is good
+        clear_coords, //Clear the hidden point,polygon and shapefile input boxes.
+        getCookie, //Get the CSRF cookie
+        get_plot, //Generate the timeseries plot from the ajax request
+        $get_plot,
+        init_events, //Initiate the map move events
+        init_jquery_var, //Initiate the jquqery variables
+        init_map,   //Initiate the map object
+        $modalUpload,
+        prepare_files, //Prepare the uploaded files to be sent as an ajax post request
+        upload_file; //Add the uploaded files to the map
 
 
     /************************************************************************
      *                    PRIVATE FUNCTION IMPLEMENTATIONS
      *************************************************************************/
+    //Initizalizing the jquery variables
     init_jquery_var=function(){
         $get_plot = $('#get-plot');
         $modalUpload = $("#modalUpload");
         $btnUpload = $("#btn-add-shp");
     };
+
+    //Initialize any relevant events. This one make sures that the map is adjusted based on the window size.
     init_events = function() {
         (function () {
             var target, observer, config;
@@ -53,11 +71,15 @@ var SGWDE_PACKAGE = (function() {
             observer.observe(target, config);
         }());
     };
+
+    //This function is critical as it will ensure that only one of three inputs has value
     clear_coords = function(){
         $("#poly-lat-lon").val('');
         $("#point-lat-lon").val('');
         $("#shp-lat-lon").val('');
     };
+
+    //Creating the map object
     init_map = function(){
         var projection = ol.proj.get('EPSG:3857');
         var baseLayer = new ol.layer.Tile({
@@ -66,10 +88,14 @@ var SGWDE_PACKAGE = (function() {
                 imagerySet: 'AerialWithLabels' // Options 'Aerial', 'AerialWithLabels', 'Road'
             })
         });
+
+        //Creating an empty source and empty layer for displaying the shpefile object
         shpSource = new ol.source.Vector();
         shpLayer = new ol.layer.Vector({
-                    source: shpSource
-                });
+            source: shpSource
+        });
+
+        //Creating an empty source and empty layer for storing the drawn features
         var source = new ol.source.Vector({
             wrapX: false
         });
@@ -107,11 +133,16 @@ var SGWDE_PACKAGE = (function() {
         map.addControl(new ol.control.ZoomSlider());
         map.addControl(fullScreenControl);
         map.crossOrigin = 'anonymous';
+
+        //Code for adding interaction for drawing on the map
         var lastFeature, draw, featureType;
+
+        //Clear the last feature before adding a new feature to the map
         var removeLastFeature = function () {
             if (lastFeature) source.removeFeature(lastFeature);
         };
 
+        //Add interaction to the map based on the selected interaction type
         var addInteraction = function (geomtype) {
             var typeSelect = document.getElementById('types');
             var value = typeSelect.value;
@@ -125,32 +156,34 @@ var SGWDE_PACKAGE = (function() {
                     type: geomtype
                 });
 
-                if (featureType === 'Point') {
 
-                    draw.on('drawend', function (e) {
-                        removeLastFeature();
-                        lastFeature = e.feature;
-                    });
-
-                } else {
-
-                    draw.on('drawend', function (e) {
-                        lastFeature = e.feature;
-
-                    });
-
-                    draw.on('drawstart', function (e) {
-                        source.clear();
-                    });
-
-                }
                 map.addInteraction(draw);
+            }
+            if (featureType === 'Point') {
+
+                draw.on('drawend', function (e) {
+                    removeLastFeature();
+                    lastFeature = e.feature;
+                });
+
+            } else {
+
+                draw.on('drawend', function (e) {
+                    lastFeature = e.feature;
+
+                });
+
+                draw.on('drawstart', function (e) {
+                    source.clear();
+                });
+
             }
 
 
         };
 
         vector_layer.getSource().on('addfeature', function(event){
+            //Extracting the point/polygon values from the drawn feature
             var feature_json = saveData();
             var parsed_feature = JSON.parse(feature_json);
             var feature_type = parsed_feature["features"][0]["geometry"]["type"];
@@ -190,6 +223,7 @@ var SGWDE_PACKAGE = (function() {
 
         }
 
+        //Retrieve the relevant modal or tool based on the map interaction item
         $('#types').change(function (e) {
             featureType = $(this).find('option:selected').val();
             if(featureType == 'None'){
@@ -219,6 +253,7 @@ var SGWDE_PACKAGE = (function() {
         init_events();
 
     };
+
 
     get_plot = function(){
         if($("#poly-lat-lon").val() == "" && $("#point-lat-lon").val() == "" && $("#shp-lat-lon").val() == ""){
@@ -304,7 +339,7 @@ var SGWDE_PACKAGE = (function() {
             processData: false,
             contentType: false,
             error: function (status) {
-                console.log(status);
+
             }, success: function (response) {
                 var extents = response.bounds;
                 shpSource = new ol.source.Vector({
@@ -404,8 +439,6 @@ var SGWDE_PACKAGE = (function() {
         init_jquery_var();
         addDefaultBehaviorToAjax();
         init_map();
-
-
     });
 
 
