@@ -34,6 +34,18 @@ class ServirGriddedWaterObservationsExplorer(TethysAppBase):
                     UrlMap(name='upload-shp',
                            url='sgwde/upload-shp',
                            controller='sgwde.controllers_ajax.upload_shp'),#Upload Shapefile Controller (See controllers_ajax.py). Gets triggered when you click upload shapefile.
+                    UrlMap(name='api_get_var_list',
+                           url='sgwde/api/GetVariableList',
+                           controller='sgwde.api.api_get_var_list'), #Get Variables API call. See api.py.
+                    UrlMap(name='api_get_available_dates',
+                           url='sgwde/api/GetAvailableDates',
+                           controller='sgwde.api.api_get_available_dates'), #Get Available Dates API call. See api.py
+                    UrlMap(name='api_get_point_values',
+                           url='sgwde/api/GetPointValues',
+                           controller='sgwde.api.api_get_point_values'), # Get values for a point API call. See api.py
+                    UrlMap(name='api_get_polygon_values',
+                           url='sgwde/api/GetPolygonValues',
+                           controller='sgwde.api.api_get_polygon_values'), #Get values for polyon bounds API call. See api.py
         )
 
         return url_maps
