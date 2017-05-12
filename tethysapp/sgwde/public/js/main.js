@@ -159,16 +159,9 @@ var SGWDE_PACKAGE = (function() {
 
                 map.addInteraction(draw);
             }
-            if (featureType === 'Point') {
+            if (featureType === 'Point' || featureType === 'Polygon') {
 
-                draw.on('drawend', function (e) {
-                    removeLastFeature();
-                    lastFeature = e.feature;
-                });
-
-            } else {
-
-                draw.on('drawend', function (e) {
+               draw.on('drawend', function (e) {
                     lastFeature = e.feature;
 
                 });
